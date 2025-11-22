@@ -4,7 +4,8 @@ import { NgModule, ModuleWithProviders, SkipSelf, Optional } from '@angular/core
 import { HttpClient } from '@angular/common/http';
 import { ApiConfiguration, ApiConfigurationParams } from './api-configuration';
 
-import { HelloControllerService } from './services/hello-controller.service';
+import { SpinControllerService } from './services/spin-controller.service';
+import { ParameterizationControllerService } from './services/parameterization-controller.service';
 
 /**
  * Module that provides all services and configuration.
@@ -14,7 +15,8 @@ import { HelloControllerService } from './services/hello-controller.service';
   exports: [],
   declarations: [],
   providers: [
-    HelloControllerService,
+    SpinControllerService,
+    ParameterizationControllerService,
     ApiConfiguration
   ],
 })

@@ -1,0 +1,9 @@
+<div class="row" [ngClass]="{ compare: isComparing }">
+  <div class="col-left">
+    <img *ngIf="imageUrl" [src]="imageUrl" alt="Generated Image">
+  </div>
+
+  <div class="col-right" *ngIf="selectGeneratedText$ | async as generatedText">
+    <span [innerHTML]="generatedText.generatedText || '-'"></span>
+  </div>
+</div>

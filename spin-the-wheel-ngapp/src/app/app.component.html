@@ -1,0 +1,22 @@
+<nav class="navbar">
+  <img class="logo" src="images/logo_white.png" alt="Spin the Wheel">
+</nav>
+<div class="container">
+  <!-- <div class="row"> -->
+    <!-- <div class="col-6"> -->
+      <app-slot-machine
+      [isComparing]="isComparing"
+      [places]="selectPlaces$ | async"
+      [times]="selectTimes$ | async"
+      [genders]="selectGenders$ | async"></app-slot-machine>
+    <!-- </div>
+    <div class="col-6">
+      <app-slot-machine
+      [isComparing]="isComparing"
+      [places]="selectPlaces$ | async"
+      [times]="selectTimes$ | async"
+      [genders]="selectGenders$ | async"></app-slot-machine>
+    </div> -->
+  <!-- </div> -->
+  <!-- <app-control-buttons [canCompare]="true" [canRestart]="false"></app-control-buttons> -->
+</div>
