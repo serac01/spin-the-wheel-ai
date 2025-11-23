@@ -10,6 +10,7 @@ import { ApiConfiguration } from '../api-configuration';
 import { StrictHttpResponse } from '../strict-http-response';
 import { RequestBuilder } from '../request-builder';
 
+import { CompareScenariosRequest } from '../models/compare-scenarios-request';
 import { GeneratedTextSources } from '../models/generated-text-sources';
 import { SpinArguments } from '../models/spin-arguments';
 
@@ -110,6 +111,53 @@ export class SpinControllerService extends BaseService {
   ): Observable<Blob> {
     return this.postGeneratedImage$Response(params, context).pipe(
       map((r: StrictHttpResponse<Blob>): Blob => r.body)
+    );
+  }
+
+  /** Path part for operation `postCompareScenarios()` */
+  static readonly PostCompareScenariosPath = '/api/spin/compare-scenarios';
+
+  /**
+   * This method provides access to the full `HttpResponse`, allowing access to response headers.
+   * To access only the response body, use `postCompareScenarios()` instead.
+   *
+   * This method sends `application/json` and handles request body of type `application/json`.
+   */
+  postCompareScenarios$Response(
+    params: {
+      body: CompareScenariosRequest
+    },
+    context?: HttpContext
+  ): Observable<StrictHttpResponse<GeneratedTextSources>> {
+    const rb = new RequestBuilder(this.rootUrl, SpinControllerService.PostCompareScenariosPath, 'post');
+    if (params) {
+      rb.body(params.body, 'application/json');
+    }
+
+    return this.http.request(
+      rb.build({ accept: 'application/json', context })
+    ).pipe(
+      filter((r: any): r is HttpResponse<any> => r instanceof HttpResponse),
+      map((r: HttpResponse<any>) => {
+        return r as StrictHttpResponse<GeneratedTextSources>;
+      })
+    );
+  }
+
+  /**
+   * This method provides access only to the response body.
+   * To access the full response (for headers, for example), `postCompareScenarios$Response()` instead.
+   *
+   * This method sends `application/json` and handles request body of type `application/json`.
+   */
+  postCompareScenarios(
+    params: {
+      body: CompareScenariosRequest
+    },
+    context?: HttpContext
+  ): Observable<GeneratedTextSources> {
+    return this.postCompareScenarios$Response(params, context).pipe(
+      map((r: StrictHttpResponse<GeneratedTextSources>): GeneratedTextSources => r.body)
     );
   }
 

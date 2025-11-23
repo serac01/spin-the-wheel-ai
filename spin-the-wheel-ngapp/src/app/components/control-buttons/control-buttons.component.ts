@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, Input } from '@angular/core';
+import { Component, EventEmitter, Input, Output } from '@angular/core';
 
 @Component({
   selector: 'app-control-buttons',
@@ -11,15 +11,23 @@ import { Component, Input } from '@angular/core';
 export class ControlButtonsComponent {
   @Input() canCompare: boolean = false;
   @Input() canRestart: boolean = false;
+  @Input() isComparingScenarios: boolean = false;
+  @Output() compareClicked = new EventEmitter<void>();
+  @Output() restartClicked = new EventEmitter<void>();
+  @Output() compareScenarioClicked = new EventEmitter<void>();
 
   constructor() { }
 
   compare() {
-
+    this.compareClicked.emit();
   }
 
   restart() {
-    
+    this.restartClicked.emit();
+  }
+
+  compareScenario(){
+    this.compareScenarioClicked.emit();
   }
 
 }
