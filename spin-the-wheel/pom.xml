@@ -62,10 +62,6 @@
 			<resource>
 				<directory>src/main/resources</directory>
 			</resource>
-			<resource>
-				<directory>mocks</directory>
-				<targetPath>mocks</targetPath>
-			</resource>
 		</resources>
 		<plugins>
 			<plugin>

@@ -1,7 +1,6 @@
 package se.spin.prototype.Controllers;
 
 import org.springframework.core.io.ByteArrayResource;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -11,12 +10,10 @@ import org.springframework.web.server.ResponseStatusException;
 import se.spin.prototype.services.FirestoreService;
 import se.spin.prototype.services.HuggingFaceService;
 import se.spin.prototype.Beans.CompareScenariosRequest;
-import se.spin.prototype.Beans.GenderEnum;
 import se.spin.prototype.Beans.GeneratedTextSources;
 import se.spin.prototype.Beans.SpinArguments;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -45,7 +42,7 @@ public class SpinController {
         generatedTextSources.setGeneratedText(story);
         List<String> sources = new ArrayList<>();
         sources.add("firestore:stories");
-        sources.add("huggingface:AI-Sweden-Models/gpt-sw3-40b");
+        sources.add("huggingface:AI-Sweden-Models/Llama-3-8B");
         generatedTextSources.setSources(sources);
         return generatedTextSources;
     }
@@ -54,31 +51,12 @@ public class SpinController {
     public ResponseEntity<ByteArrayResource> postGeneratedImage(@RequestBody SpinArguments body) throws IOException {
         validateSpinArguments(body);
 
-        String filename = "paula-rego.jpg";
-        if(body.getGender().getId() == GenderEnum.MALE){
-            filename = "van-gogh.jpg";
-        }else if(body.getGender().getId() == GenderEnum.FEMALE){
-            filename = "mona-lisa.jpg";
-        }
-
-        ClassPathResource resource = new ClassPathResource("mocks/" + filename);
-        if (!resource.exists()) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Image asset not found");
-        }
-
-        byte[] data;
-        try (InputStream is = resource.getInputStream()) {
-            data = is.readAllBytes();
-        }
-
-        ByteArrayResource bodyResource = new ByteArrayResource(data);
-
-        String contentType = java.net.URLConnection.guessContentTypeFromStream(new java.io.ByteArrayInputStream(data));
-        if (contentType == null) contentType = "application/octet-stream";
+        var imageResult = huggingFaceService.generateImage(body);
+        ByteArrayResource bodyResource = new ByteArrayResource(imageResult.data());
 
         return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType(contentType))
-                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + filename + "\"")
+                .contentType(imageResult.contentType())
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"story-image.png\"")
                 .body(bodyResource);
     }
 
