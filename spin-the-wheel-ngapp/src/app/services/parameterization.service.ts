@@ -19,25 +19,40 @@ export class ParameterizationService {
   readonly selectPlaces$: Observable<string[]> = this.state$.pipe(map(state => state.places)).pipe(filter((p) => !!p), map((p) => p!));
   readonly selectTimes$: Observable<number[]> = this.state$.pipe(map(state => state.times)).pipe(filter((p) => !!p), map((p) => p!));
   readonly selectGenders$: Observable<Gender[]> = this.state$.pipe(map(state => state.genders)).pipe(filter((p) => !!p), map((p) => p!));
- 
+
   constructor(private applicationService: ApplicationService, private rest: ParameterizationControllerService, private loadingService: LoadingService) { }
-  
+
   getPlaces() {
     this.loadingService.show();
-    this.applicationService.effect(this.rest.getPlaces(), (places) => { this.loadingService.hide(); this.updateState((s) => ({ ...s, places})); });
+    this.applicationService.effect(
+      this.rest.getPlaces(),
+      (places) => { this.updateState((s) => ({ ...s, places })); },
+      undefined,
+      () => this.loadingService.hide()
+    );
   }
-  
+
   getTimes() {
     this.loadingService.show();
-    this.applicationService.effect(this.rest.getTimes(), (times) => { this.loadingService.hide(); this.updateState((s) => ({ ...s, times})); });
+    this.applicationService.effect(
+      this.rest.getTimes(),
+      (times) => { this.updateState((s) => ({ ...s, times })); },
+      undefined,
+      () => this.loadingService.hide()
+    );
   }
-  
+
   getGenders() {
     this.loadingService.show();
-    this.applicationService.effect(this.rest.getGenders(), (genders) => { this.loadingService.hide(); this.updateState((s) => ({ ...s, genders})); });
+    this.applicationService.effect(
+      this.rest.getGenders(),
+      (genders) => { this.updateState((s) => ({ ...s, genders })); },
+      undefined,
+      () => this.loadingService.hide()
+    );
   }
-  
-  cleanState(){ this.state$.next({}); }
+
+  cleanState() { this.state$.next({}); }
 
   updateState(nextState: (previous: ParameterizationState) => ParameterizationState) {
     this.state$.next(nextState(this.state$.getValue()));

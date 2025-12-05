@@ -10,7 +10,7 @@
 </div>
 
 <div class="controls" *ngIf="!resultVisible">
-  <button (click)="spin()" [disabled]="spinning">Spin!</button>
+  <button (click)="spin()" [disabled]="spinning || !canSpin">Spin!</button>
 </div>
 
 <div *ngIf="resultVisible">

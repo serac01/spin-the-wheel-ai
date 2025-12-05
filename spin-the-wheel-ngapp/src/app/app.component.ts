@@ -61,15 +61,15 @@ export class AppComponent implements OnInit {
     }
   }
 
-  onCompareScenarioClicked(){
+  onCompareScenarioClicked() {
     const slot1Data = this.slot1.getCurrentData();
     const slot2Data = this.slot2.getCurrentData();
 
     this.compareScenarioBody = {
-      generatedTextSourcesFirstStory: slot1Data.body.generatedTextSourcesFirstStory,
-      generatedTextSourcesSecondStory: slot2Data.body.generatedTextSourcesFirstStory,
-      spinArgumentsFirstStory: slot1Data.body.spinArgumentsFirstStory,
-      spinArgumentsSecondStory: slot2Data.body.spinArgumentsFirstStory
+      generatedTextSourcesFirstStory: slot1Data.generatedTextSources,
+      generatedTextSourcesSecondStory: slot2Data.generatedTextSources,
+      spinArgumentsFirstStory: slot1Data.spinArguments,
+      spinArgumentsSecondStory: slot2Data.spinArguments
     }
     this.isComparingScenarios = true;
   }

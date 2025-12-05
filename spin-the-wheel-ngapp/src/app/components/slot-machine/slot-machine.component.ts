@@ -1,5 +1,5 @@
 import { Component, Input, OnInit, OnChanges, SimpleChanges, Output, EventEmitter } from '@angular/core';
-import { CompareScenariosRequest, Gender, SpinArguments } from '../../api/models';
+import { Gender, GeneratedTextSources, SpinArguments } from '../../api/models';
 import { CommonModule } from '@angular/common';
 import { StoryComponent } from '../story/story.component';
 import { SpinService } from '../../services/spin.service';
@@ -26,6 +26,7 @@ export class SlotMachineComponent implements OnInit, OnChanges {
   resultVisible = false;
   resultImage = '';
   resultText = '';
+  canSpin = false;
 
   constructor(private spinService: SpinService) { }
 
@@ -35,6 +36,7 @@ export class SlotMachineComponent implements OnInit, OnChanges {
       { list: [], transform: 'translateY(0px)', duration: 0, items: this.times },
       { list: [], transform: 'translateY(0px)', duration: 0, items: this.genders }
     ];
+    this.updateCanSpin();
   }
 
   ngOnChanges(changes: SimpleChanges) {
@@ -42,6 +44,7 @@ export class SlotMachineComponent implements OnInit, OnChanges {
       this.slots[0].items = this.places ?? [];
       this.slots[1].items = this.times ?? [];
       this.slots[2].items = this.genders ?? [];
+      this.updateCanSpin();
     }
     if (changes['restart'] && changes['restart'].currentValue === true) {
       this.resetComponent();
@@ -49,7 +52,7 @@ export class SlotMachineComponent implements OnInit, OnChanges {
   }
 
   spin() {
-    if (this.spinning) return;
+    if (this.spinning || !this.canSpin) return;
     this.resultVisible = false;
     this.spinning = true;
     this.slots.forEach((slot: any, index) => {
@@ -103,21 +106,28 @@ export class SlotMachineComponent implements OnInit, OnChanges {
       { list: [], transform: 'translateY(0px)', duration: 0, items: this.times },
       { list: [], transform: 'translateY(0px)', duration: 0, items: this.genders }
     ];
-    
+
+    this.updateCanSpin();
+
     this.resultVisibleChange.emit({ id: this.id, visible: false });
   }
 
-  getCurrentData(): {id: number, body: CompareScenariosRequest} {
+  getCurrentData(): { id: number, spinArguments: SpinArguments, generatedTextSources?: GeneratedTextSources } {
     return {
       id: this.id,
-      body: {
-        spinArgumentsFirstStory: {
-          city: this.body.city,
-          gender: this.body.gender,
-          year: this.body.year
-        },
-        generatedTextSourcesFirstStory: this.spinService.getGeneratedTextInState()
-      }
+      spinArguments: {
+        city: this.body.city,
+        gender: this.body.gender,
+        year: this.body.year
+      },
+      generatedTextSources: this.spinService.getGeneratedTextInState()
     };
+  }
+
+  private updateCanSpin() {
+    const havePlaces = Array.isArray(this.places) && this.places.length > 0;
+    const haveTimes = Array.isArray(this.times) && this.times.length > 0;
+    const haveGenders = Array.isArray(this.genders) && this.genders.length > 0;
+    this.canSpin = havePlaces && haveTimes && haveGenders;
   }
 }

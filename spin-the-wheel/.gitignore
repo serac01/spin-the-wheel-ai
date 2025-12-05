@@ -31,3 +31,5 @@ build/
 
 ### VS Code ###
 .vscode/
+.env
+wheel-3c2b4-firebase-adminsdk-fbsvc-ab652a5b57.json
