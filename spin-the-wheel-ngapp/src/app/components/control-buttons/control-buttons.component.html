@@ -1,8 +1,5 @@
-<div class="controls" *ngIf="canCompare">
-  <button (click)="compare()">Generate other</button>
-  <button (click)="restart()" class="ms-2">Restart</button>
-</div>
-<div class="controls" *ngIf="canRestart">
-  <button *ngIf="!isComparingScenarios" (click)="compareScenario()" class="ms-2">Compare scenarios</button>
-  <button (click)="restart()" class="ms-2">Restart</button>
+<div class="controls" *ngIf="canCompare || canRestart">
+  <button *ngIf="canCompare" (click)="compare()">Generate other</button>
+  <button *ngIf="canRestart && !isComparingScenarios" (click)="compareScenario()" class="ms-2">Compare scenarios</button>
+  <button *ngIf="canRestart" (click)="restart()" class="ms-2">Restart</button>
 </div>

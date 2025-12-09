@@ -70,17 +70,28 @@ public class SpinController {
         validateSpinArguments(arguments.getSpinArgumentsFirstStory());
         validateSpinArguments(arguments.getSpinArgumentsSecondStory());
 
+        SpinArguments firstArgs = arguments.getSpinArgumentsFirstStory();
+        SpinArguments secondArgs = arguments.getSpinArgumentsSecondStory();
+
+        String firstSeed = firestoreService.fetchSeedText(firstArgs.getCity(), firstArgs.getYear(), firstArgs.getGender())
+            .orElse("No matching Firestore seed; use the provided context to craft a new story.");
+        String secondSeed = firestoreService.fetchSeedText(secondArgs.getCity(), secondArgs.getYear(), secondArgs.getGender())
+            .orElse("No matching Firestore seed; use the provided context to craft a new story.");
+
+        String firstStory = huggingFaceService.generateStory(firstArgs, firstSeed);
+        String secondStory = huggingFaceService.generateStory(secondArgs, secondSeed);
+
+        StringBuilder comparison = new StringBuilder();
+        comparison.append("Story 1 (" + firstArgs.getCity() + ", " + firstArgs.getYear() + "):\n")
+            .append(firstStory)
+            .append("\n\nStory 2 (" + secondArgs.getCity() + ", " + secondArgs.getYear() + "):\n")
+            .append(secondStory);
+
         GeneratedTextSources generatedTextSources = new GeneratedTextSources();
-        generatedTextSources.setGeneratedText("This is a comparison between two stories. The first in "+arguments.getSpinArgumentsFirstStory().getCity()+", on "+arguments.getSpinArgumentsFirstStory().getYear()+" and it's about a "+arguments.getSpinArgumentsFirstStory().getGender().getDescription() +
-                ". The second in "+arguments.getSpinArgumentsSecondStory().getCity()+", on "+arguments.getSpinArgumentsSecondStory().getYear()+" and it's about a "+arguments.getSpinArgumentsSecondStory().getGender().getDescription() +
-                ". \nLorem ipsum dolor sit amet, consectetur adipiscing elit. Proin ut erat porttitor, condimentum purus id, lobortis ipsum. Nam efficitur malesuada urna, vitae porttitor augue faucibus vel. Phasellus vitae fringilla nibh, ut rhoncus diam. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Interdum et malesuada fames ac ante ipsum primis in faucibus. Mauris vestibulum in ex sed vehicula. Maecenas pulvinar massa ut bibendum posuere. Sed sit amet purus maximus, semper magna vel, finibus mauris. Praesent laoreet felis non cursus tempus. Donec feugiat semper consectetur. Praesent eget dui ornare, tempus nulla eget, bibendum magna.\n" +
-                "\n" +
-                "Interdum et malesuada fames ac ante ipsum primis in faucibus. Cras ligula ligula, luctus in magna quis, egestas iaculis mauris. Mauris lacinia hendrerit massa sed rutrum. Proin ut sem eget enim hendrerit euismod vel et elit. In iaculis eros mauris. In hac habitasse platea dictumst. Vestibulum et commodo sem. Cras mauris lacus, volutpat vel porttitor placerat, fringilla et libero. Curabitur volutpat magna sit amet risus consectetur commodo. Vivamus porta mollis libero a fermentum. Proin vestibulum vehicula tellus, porttitor pharetra lectus dictum eu. Curabitur ornare, urna non auctor congue, tellus nunc sollicitudin ante, eu faucibus nibh dolor nec urna. Vivamus eu lobortis arcu, vitae vestibulum massa. In pulvinar risus orci, sit amet luctus mi sollicitudin eget. Maecenas vel odio fermentum, blandit est in, dictum sem. Vivamus eu libero nunc.");
+        generatedTextSources.setGeneratedText(comparison.toString());
         List<String> sources = new ArrayList<>();
-        sources.add("umea.se");
-        sources.add("sweden.se");
-        sources.add("malmo.se");
-        sources.add("uppsala.se");
+        sources.add("firestore:stories");
+        sources.add("huggingface:text-model");
         generatedTextSources.setSources(sources);
         return generatedTextSources;
     }

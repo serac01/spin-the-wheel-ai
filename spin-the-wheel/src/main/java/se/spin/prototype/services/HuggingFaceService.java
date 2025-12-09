@@ -22,8 +22,12 @@ import java.util.Map;
 @Component
 public class HuggingFaceService {
     private static final Logger log = LoggerFactory.getLogger(HuggingFaceService.class);
-    private static final String TEXT_MODEL_URL = "https://api-inference.huggingface.co/models/AI-Sweden-Models/Llama-3-8B";
-    private static final String IMAGE_MODEL_URL = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0";
+    // Use router endpoint with wait_for_model to avoid cold-start 404s.
+    private static final String HF_ROUTER = "https://router.huggingface.co";
+    // Defaults to public models; can be overridden via env if you have gated/private access.
+    // Pick widely available public models to avoid 404s from gated models; can override via env HF_TEXT_MODEL / HF_IMAGE_MODEL.
+    private static final String DEFAULT_TEXT_MODEL = "HuggingFaceH4/zephyr-7b-beta"; // widely accessible on router
+    private static final String DEFAULT_IMAGE_MODEL = "prompthero/openjourney-v4"; // SD1.5 derivative that is usually served
 
     private final RestTemplate restTemplate = new RestTemplate();
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -50,13 +54,19 @@ public class HuggingFaceService {
 
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(payload, headers);
 
-        ResponseEntity<String> response = restTemplate.exchange(TEXT_MODEL_URL, HttpMethod.POST, entity, String.class);
-        if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
-            log.error("HuggingFace call failed: status {} body {}", response.getStatusCode(), response.getBody());
-            throw new ResponseStatusException(response.getStatusCode(), "HuggingFace generation failed");
+        String url = buildModelUrl(EnvUtil.get("HF_TEXT_MODEL"), DEFAULT_TEXT_MODEL);
+        try {
+            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
+            if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
+                log.error("HuggingFace call failed: status {} body {}", response.getStatusCode(), response.getBody());
+                throw new ResponseStatusException(response.getStatusCode(), "HuggingFace generation failed");
+            }
+            return extractText(response.getBody());
+        } catch (org.springframework.web.client.HttpStatusCodeException ex) {
+            String body = ex.getResponseBodyAsString();
+            log.error("HuggingFace text error: status {} body {}", ex.getStatusCode(), body);
+            throw new ResponseStatusException(ex.getStatusCode(), "HuggingFace text error: " + body);
         }
-
-        return extractText(response.getBody());
     }
 
     public ImageResult generateImage(SpinArguments arguments) {
@@ -77,22 +87,32 @@ public class HuggingFaceService {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.setBearerAuth(token);
-        headers.setAccept(java.util.List.of(MediaType.IMAGE_PNG));
+        // Accept any image format; the router/model can return jpeg/png/webp depending on the backend.
+        headers.setAccept(java.util.List.of(MediaType.ALL));
 
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(payload, headers);
 
-        ResponseEntity<byte[]> response = restTemplate.exchange(IMAGE_MODEL_URL, HttpMethod.POST, entity, byte[].class);
-        if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
-            log.error("HuggingFace image call failed: status {}", response.getStatusCode());
-            throw new ResponseStatusException(response.getStatusCode(), "HuggingFace image generation failed");
-        }
+        String url = buildModelUrl(EnvUtil.get("HF_IMAGE_MODEL"), DEFAULT_IMAGE_MODEL);
+        try {
+            ResponseEntity<byte[]> response = restTemplate.exchange(url, HttpMethod.POST, entity, byte[].class);
+            if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
+                log.error("HuggingFace image call failed: status {} body {}", response.getStatusCode(), response.getBody());
+                throw new ResponseStatusException(response.getStatusCode(), "HuggingFace image generation failed");
+            }
 
-        MediaType contentType = response.getHeaders().getContentType();
-        if (contentType == null) {
-            contentType = MediaType.IMAGE_PNG;
-        }
+            MediaType contentType = response.getHeaders().getContentType();
+            if (contentType == null || !contentType.getType().equalsIgnoreCase("image")) {
+                // Guard against JSON error bodies or empty content-type slips.
+                log.error("HuggingFace image response not an image: content-type {}", contentType);
+                throw new ResponseStatusException(org.springframework.http.HttpStatus.BAD_GATEWAY, "HuggingFace returned non-image payload");
+            }
 
-        return new ImageResult(response.getBody(), contentType);
+            return new ImageResult(response.getBody(), contentType);
+        } catch (org.springframework.web.client.HttpStatusCodeException ex) {
+            String body = ex.getResponseBodyAsString();
+            log.error("HuggingFace image error: status {} body {}", ex.getStatusCode(), body);
+            throw new ResponseStatusException(ex.getStatusCode(), "HuggingFace image error: " + body);
+        }
     }
 
     private String buildPrompt(SpinArguments args, String seedText) {
@@ -119,18 +139,35 @@ public class HuggingFaceService {
     private String extractText(String body) {
         try {
             JsonNode node = objectMapper.readTree(body);
+
+            // Common HF router shape: [{"generated_text": "..."}]
             if (node.isArray() && node.size() > 0) {
                 JsonNode first = node.get(0);
                 if (first.has("generated_text")) {
                     return first.get("generated_text").asText();
                 }
             }
-            // Some HF responses return {"error":...}
+
+            // Some backends return {"generated_text": "..."}
+            if (node.isObject() && node.has("generated_text")) {
+                return node.get("generated_text").asText();
+            }
+
+            // Fallback: raw string body (already text)
+            if (node.isTextual()) {
+                return node.asText();
+            }
+
             log.error("Unexpected HuggingFace response: {}", body);
             throw new ResponseStatusException(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected HuggingFace response format");
         } catch (IOException e) {
             throw new ResponseStatusException(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR, "Failed to parse HuggingFace response", e);
         }
+    }
+
+    private String buildModelUrl(String overrideModel, String defaultModel) {
+        String model = (overrideModel != null && !overrideModel.isBlank()) ? overrideModel : defaultModel;
+        return HF_ROUTER + "/models/" + model + "?wait_for_model=true";
     }
 
     public record ImageResult(byte[] data, MediaType contentType) {}

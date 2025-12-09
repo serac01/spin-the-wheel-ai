@@ -35,10 +35,11 @@ public class FirestoreService {
 
     public Optional<String> fetchSeedText(String city, Integer year, Gender gender) {
         try {
-            Query query = firestore.collection(COLLECTION_NAME)
+                Query query = firestore.collection(COLLECTION_NAME)
                     .whereEqualTo("city", city)
                     .whereEqualTo("year", year)
-                    .whereEqualTo("gender", gender != null ? gender.getId() : null)
+                    // Firestore stores gender as a string (enum name), so match on name rather than enum instance.
+                    .whereEqualTo("gender", gender != null && gender.getId() != null ? gender.getId().name() : null)
                     .limit(1);
 
             ApiFuture<QuerySnapshot> future = query.get();
@@ -46,7 +47,7 @@ public class FirestoreService {
             if (snapshot.isEmpty()) {
                 return Optional.empty();
             }
-            QueryDocumentSnapshot doc = snapshot.getDocuments().getFirst();
+            QueryDocumentSnapshot doc = snapshot.getDocuments().get(0);
             Object text = doc.get("text");
             return text != null ? Optional.of(text.toString()) : Optional.empty();
         } catch (InterruptedException e) {
