@@ -24,6 +24,7 @@ import java.util.concurrent.ExecutionException;
 
 @Component
 public class FirestoreService {
+
     private static final Logger log = LoggerFactory.getLogger(FirestoreService.class);
     private static final String COLLECTION_NAME = "stories";
 
@@ -33,14 +34,16 @@ public class FirestoreService {
         this.firestore = initFirestore();
     }
 
+
     public Optional<String> fetchSeedText(String city, Integer year, Gender gender) {
+
         try {
-                Query query = firestore.collection(COLLECTION_NAME)
-                    .whereEqualTo("city", city)
-                    .whereEqualTo("year", year)
-                    // Firestore stores gender as a string (enum name), so match on name rather than enum instance.
-                    .whereEqualTo("gender", gender != null && gender.getId() != null ? gender.getId().name() : null)
-                    .limit(1);
+
+            Query query = firestore.collection(COLLECTION_NAME)
+                .whereEqualTo("city", city)
+                .whereEqualTo("year", year)
+                .whereEqualTo("gender", gender.getId().name())
+                .limit(1);
 
             ApiFuture<QuerySnapshot> future = query.get();
             QuerySnapshot snapshot = future.get();
@@ -49,7 +52,9 @@ public class FirestoreService {
             }
             QueryDocumentSnapshot doc = snapshot.getDocuments().get(0);
             Object text = doc.get("text");
+
             return text != null ? Optional.of(text.toString()) : Optional.empty();
+
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Interrupted while querying Firestore", e);
@@ -59,26 +64,20 @@ public class FirestoreService {
     }
 
     private Firestore initFirestore() {
+
         try {
+
             if (FirebaseApp.getApps().isEmpty()) {
+
                 FirebaseOptions.Builder builder = FirebaseOptions.builder();
+                builder.setCredentials(GoogleCredentials.fromStream(new FileInputStream(EnvUtil.get("GOOGLE_APPLICATION_CREDENTIALS"))));
+                builder.setProjectId(EnvUtil.get("FIREBASE_PROJECT_ID"));
 
-                String credentialsPath = EnvUtil.get("GOOGLE_APPLICATION_CREDENTIALS");
-                if (credentialsPath != null && !credentialsPath.isBlank()) {
-                    builder.setCredentials(GoogleCredentials.fromStream(new FileInputStream(credentialsPath)));
-                } else {
-                    builder.setCredentials(GoogleCredentials.getApplicationDefault());
-                }
-
-                String projectId = EnvUtil.get("FIREBASE_PROJECT_ID");
-                if (projectId != null && !projectId.isBlank()) {
-                    builder.setProjectId(projectId);
-                }
-
-                FirebaseOptions options = builder.build();
-                FirebaseApp.initializeApp(options);
+                FirebaseApp.initializeApp(uilder.build());
             }
+            
             return FirestoreClient.getFirestore();
+
         } catch (IOException e) {
             log.error("Failed to initialize Firestore", e);
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Could not initialize Firestore", e);

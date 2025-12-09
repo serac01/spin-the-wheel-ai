@@ -16,13 +16,12 @@ public class ParameterizationController {
 
     @GetMapping("/genders")
     public List<Gender> getGenders() {
-        return Arrays.stream(GenderEnum.values())
-                .map(g -> new Gender(g, g.getDescription()))
-                .toList();
+        return Arrays.stream(GenderEnum.values()).map(g -> new Gender(g, g.getDescription())).toList();
     }
 
     @GetMapping("/times")
     public List<Integer> getTimes() {
+        
         int start = 1800;
         int end = 2025;
         List<Integer> decades = new ArrayList<>();

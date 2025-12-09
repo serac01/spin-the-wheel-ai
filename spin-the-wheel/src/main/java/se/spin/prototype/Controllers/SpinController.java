@@ -34,74 +34,91 @@ public class SpinController {
     public GeneratedTextSources postGeneratedText(@RequestBody SpinArguments arguments) {
         validateSpinArguments(arguments);
 
-        Optional<String> seed = firestoreService.fetchSeedText(arguments.getCity(), arguments.getYear(), arguments.getGender());
-        String seedText = seed.orElse("No matching Firestore seed; use the provided context to craft a new story.");
-        String story = huggingFaceService.generateStory(arguments, seedText);
+        String story = huggingFaceService.generateStory(
+            arguments, 
+            firestoreService.fetchSeedText(
+                arguments.getCity(), 
+                arguments.getYear(), 
+                arguments.getGender()
+            ).orElse("No matching Firestore seed; use the provided context to craft a new story.")
+        );
 
         GeneratedTextSources generatedTextSources = new GeneratedTextSources();
         generatedTextSources.setGeneratedText(story);
+
         List<String> sources = new ArrayList<>();
         sources.add("firestore:stories");
         sources.add("huggingface:AI-Sweden-Models/Llama-3-8B");
+
         generatedTextSources.setSources(sources);
+
         return generatedTextSources;
     }
 
     @PostMapping("/image")
     public ResponseEntity<ByteArrayResource> postGeneratedImage(@RequestBody SpinArguments body) throws IOException {
+
         validateSpinArguments(body);
 
         var imageResult = huggingFaceService.generateImage(body);
-        ByteArrayResource bodyResource = new ByteArrayResource(imageResult.data());
 
         return ResponseEntity.ok()
                 .contentType(imageResult.contentType())
                 .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"story-image.png\"")
-                .body(bodyResource);
+                .body(new ByteArrayResource(imageResult.data()));
     }
 
     @PostMapping("/compare-scenarios")
     public GeneratedTextSources postCompareScenarios(@RequestBody CompareScenariosRequest arguments) {
-        if (arguments == null
-                || arguments.getSpinArgumentsFirstStory() == null
-                || arguments.getSpinArgumentsSecondStory() == null) {
+
+        if (arguments == null || arguments.getSpinArgumentsFirstStory() == null || arguments.getSpinArgumentsSecondStory() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Both scenarios are required");
         }
+
         validateSpinArguments(arguments.getSpinArgumentsFirstStory());
         validateSpinArguments(arguments.getSpinArgumentsSecondStory());
 
         SpinArguments firstArgs = arguments.getSpinArgumentsFirstStory();
         SpinArguments secondArgs = arguments.getSpinArgumentsSecondStory();
 
-        String firstSeed = firestoreService.fetchSeedText(firstArgs.getCity(), firstArgs.getYear(), firstArgs.getGender())
-            .orElse("No matching Firestore seed; use the provided context to craft a new story.");
-        String secondSeed = firestoreService.fetchSeedText(secondArgs.getCity(), secondArgs.getYear(), secondArgs.getGender())
-            .orElse("No matching Firestore seed; use the provided context to craft a new story.");
-
-        String firstStory = huggingFaceService.generateStory(firstArgs, firstSeed);
-        String secondStory = huggingFaceService.generateStory(secondArgs, secondSeed);
+        String firstStory = huggingFaceService.generateStory(
+            firstArgs, 
+            firestoreService.fetchSeedText(
+                firstArgs.getCity(), 
+                firstArgs.getYear(), 
+                firstArgs.getGender()
+            )
+            .orElse("No matching Firestore seed; use the provided context to craft a new story.")
+        );
+        String secondStory = huggingFaceService.generateStory(
+            secondArgs, 
+            firestoreService.fetchSeedText(
+                secondArgs.getCity(), 
+                secondArgs.getYear(), 
+                secondArgs.getGender()
+            )
+            .orElse("No matching Firestore seed; use the provided context to craft a new story.")
+        );
 
         StringBuilder comparison = new StringBuilder();
-        comparison.append("Story 1 (" + firstArgs.getCity() + ", " + firstArgs.getYear() + "):\n")
-            .append(firstStory)
-            .append("\n\nStory 2 (" + secondArgs.getCity() + ", " + secondArgs.getYear() + "):\n")
-            .append(secondStory);
+        comparison
+            .append("Story 1 (" + firstArgs.getCity() + ", " + firstArgs.getYear() + "):\n").append(firstStory)
+            .append("\n\nStory 2 (" + secondArgs.getCity() + ", " + secondArgs.getYear() + "):\n").append(secondStory);
 
         GeneratedTextSources generatedTextSources = new GeneratedTextSources();
         generatedTextSources.setGeneratedText(comparison.toString());
+
         List<String> sources = new ArrayList<>();
         sources.add("firestore:stories");
         sources.add("huggingface:text-model");
+
         generatedTextSources.setSources(sources);
+
         return generatedTextSources;
     }
 
     private void validateSpinArguments(SpinArguments arguments) {
-        if (arguments == null
-                || arguments.getCity() == null
-                || arguments.getYear() == null
-                || arguments.getGender() == null
-                || arguments.getGender().getId() == null) {
+        if (arguments == null || arguments.getCity() == null || arguments.getYear() == null || arguments.getGender() == null || arguments.getGender().getId() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "City, year and gender are required");
         }
     }
