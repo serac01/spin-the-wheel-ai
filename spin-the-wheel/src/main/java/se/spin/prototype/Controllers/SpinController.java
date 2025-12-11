@@ -6,6 +6,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import org.springframework.web.server.ResponseStatusException;
 import se.spin.prototype.services.FirestoreService;
 import se.spin.prototype.services.HuggingFaceService;
@@ -16,7 +17,6 @@ import se.spin.prototype.Beans.SpinArguments;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/spin")
@@ -53,6 +53,33 @@ public class SpinController {
         generatedTextSources.setSources(sources);
 
         return generatedTextSources;
+    }
+
+    @PostMapping(value = "/story/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter postGeneratedTextStream(@RequestBody SpinArguments arguments) {
+        validateSpinArguments(arguments);
+
+        String seed = firestoreService.fetchSeedText(
+            arguments.getCity(),
+            arguments.getYear(),
+            arguments.getGender()
+        ).orElse("No matching Firestore seed; use the provided context to craft a new story.");
+
+        SseEmitter emitter = new SseEmitter(0L);
+
+        huggingFaceService.streamStory(arguments, seed)
+            .doOnNext(chunk -> {
+                try {
+                    emitter.send(SseEmitter.event().data(chunk));
+                } catch (IOException e) {
+                    emitter.completeWithError(e);
+                }
+            })
+            .doOnComplete(emitter::complete)
+            .doOnError(emitter::completeWithError)
+            .subscribe();
+
+        return emitter;
     }
 
     @PostMapping("/image")
@@ -112,6 +139,55 @@ public class SpinController {
         generatedTextSources.setSources(sources);
 
         return generatedTextSources;
+    }
+
+    @PostMapping(value = "/compare-scenarios/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter postCompareScenariosStream(@RequestBody CompareScenariosRequest arguments) {
+
+        if (arguments == null || arguments.getSpinArgumentsFirstStory() == null || arguments.getSpinArgumentsSecondStory() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Both scenarios are required");
+        }
+
+        validateSpinArguments(arguments.getSpinArgumentsFirstStory());
+        validateSpinArguments(arguments.getSpinArgumentsSecondStory());
+
+        SpinArguments firstArgs = arguments.getSpinArgumentsFirstStory();
+        SpinArguments secondArgs = arguments.getSpinArgumentsSecondStory();
+
+        String firstStory = huggingFaceService.generateStory(
+            firstArgs,
+            firestoreService.fetchSeedText(
+                firstArgs.getCity(),
+                firstArgs.getYear(),
+                firstArgs.getGender()
+            )
+            .orElse("No matching Firestore seed; use the provided context to craft a new story.")
+        );
+        String secondStory = huggingFaceService.generateStory(
+            secondArgs,
+            firestoreService.fetchSeedText(
+                secondArgs.getCity(),
+                secondArgs.getYear(),
+                secondArgs.getGender()
+            )
+            .orElse("No matching Firestore seed; use the provided context to craft a new story.")
+        );
+
+        SseEmitter emitter = new SseEmitter(0L);
+
+        huggingFaceService.streamCompareStories(firstArgs, secondArgs, firstStory, secondStory)
+            .doOnNext(chunk -> {
+                try {
+                    emitter.send(SseEmitter.event().data(chunk));
+                } catch (IOException e) {
+                    emitter.completeWithError(e);
+                }
+            })
+            .doOnComplete(emitter::complete)
+            .doOnError(emitter::completeWithError)
+            .subscribe();
+
+        return emitter;
     }
 
     private void validateSpinArguments(SpinArguments arguments) {

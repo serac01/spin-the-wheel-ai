@@ -6,7 +6,6 @@ import { GeneratedTextSources, SpinArguments } from '../../api/models';
 import { Observable, map } from 'rxjs';
 import { NgIconComponent, provideIcons } from '@ng-icons/core';
 import { iconoirArrowUpRight, iconoirXmark } from "@ng-icons/iconoir";
-import { LoadingService } from '../../services/loading.service';
 
 @Component({
   selector: 'app-story',
@@ -23,11 +22,9 @@ export class StoryComponent implements OnInit, AfterViewInit {
   readonly selectGeneratedText$: Observable<GeneratedTextSources>
   imageUrl$: Observable<SafeUrl | null> | null = null;
   isTooltipOpen = false;
-  loading$: Observable<boolean>;
 
-  constructor(private spinService: SpinService, private sanitizer: DomSanitizer, private loadingService: LoadingService) {
+  constructor(private spinService: SpinService, private sanitizer: DomSanitizer) {
     this.selectGeneratedText$ = spinService.selectGeneratedText$;
-    this.loading$ = loadingService.loading$;
   }
 
   ngOnInit() {
@@ -42,7 +39,7 @@ export class StoryComponent implements OnInit, AfterViewInit {
       // Trigger API calls after first change detection pass to avoid NG0100
       queueMicrotask(() => {
         this.spinService.getGeneratedImage(this.body!);
-        this.spinService.getGeneratedText(this.body!);
+        this.spinService.streamGeneratedText(this.body!);
       });
     }
   }

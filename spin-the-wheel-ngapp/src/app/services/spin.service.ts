@@ -4,7 +4,7 @@ import { ApplicationService } from './application.service';
 import { SpinControllerService } from '../api/services';
 import { CompareScenariosRequest, GeneratedTextSources, SpinArguments } from '../api/models';
 import { LoadingService } from './loading.service';
-import { CompareScenarioComponent } from '../components/compare-scenario/compare-scenario.component';
+import { ApiConfiguration } from '../api/api-configuration';
 
 interface SpinState {
   generatedText?: GeneratedTextSources,
@@ -21,7 +21,12 @@ export class SpinService {
   readonly selectGeneratedComparison$: Observable<GeneratedTextSources> = this.state$.pipe(map(state => state.compareScenariosText)).pipe(filter((p) => !!p), map((p) => p!));
   readonly selectGeneratedImage$: Observable<Blob> = this.state$.pipe(map(state => state.generatedImage)).pipe(filter((p) => !!p), map((p) => p!));
 
-  constructor(private applicationService: ApplicationService, private rest: SpinControllerService, private loadingService: LoadingService) { }
+  constructor(
+    private applicationService: ApplicationService,
+    private rest: SpinControllerService,
+    private loadingService: LoadingService,
+    private apiConfiguration: ApiConfiguration,
+  ) { }
 
   getGeneratedImage(args: SpinArguments) {
     this.loadingService.show();
@@ -43,6 +48,123 @@ export class SpinService {
       undefined,
       () => this.loadingService.hide()
     );
+  }
+
+  streamGeneratedText(body: SpinArguments) {
+    const url = `${this.apiConfiguration.rootUrl}/api/spin/story/stream`;
+    this.cleanState();
+    this.streamSse(url, body, (delta) => {
+      this.updateState((s) => {
+        const existing = s.generatedText?.generatedText ?? '';
+        return {
+          ...s,
+          generatedText: {
+            generatedText: existing + delta,
+            sources: ['firestore:stories', 'huggingface:AI-Sweden-Models/Llama-3-8B']
+          }
+        };
+      });
+    });
+  }
+
+  streamCompareScenarios(body: CompareScenariosRequest) {
+    const url = `${this.apiConfiguration.rootUrl}/api/spin/compare-scenarios/stream`;
+
+    // Reset only comparison text to allow stories to remain visible.
+    this.updateState((s) => ({ ...s, compareScenariosText: undefined }));
+
+    this.streamSse(url, body, (delta) => {
+      this.updateState((s) => {
+        const existing = s.compareScenariosText?.generatedText ?? '';
+        return {
+          ...s,
+          compareScenariosText: {
+            generatedText: existing + delta,
+            sources: ['firestore:stories', 'huggingface:AI-Sweden-Models/Llama-3-8B']
+          }
+        };
+      });
+    });
+  }
+
+  private async streamSse(url: string, body: unknown, onDelta: (delta: string) => void) {
+    const decoder = new TextDecoder();
+    this.loadingService.show();
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+
+      if (!response.ok || !response.body) {
+        throw new Error(`Streaming request failed (${response.status})`);
+      }
+
+      const reader = response.body.getReader();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const events = buffer.split('\n\n');
+        buffer = events.pop() ?? '';
+
+        for (const event of events) {
+          const lines = event.split(/\r?\n/);
+          for (const rawLine of lines) {
+            const line = rawLine.trimEnd();
+            if (!line.startsWith('data:')) continue;
+
+            let data = line.substring(5);
+
+            // Remove repeated data: prefixes on this line only, preserving any spaces in the payload
+            while (data.startsWith('data:') || data.startsWith(' data:')) {
+              data = data.replace(/^\s*data:/i, '');
+            }
+
+            if (!data || data === '[DONE]') continue;
+
+            try {
+              const isJson = data.trim().startsWith('{');
+              const delta = isJson ? this.extractDelta(JSON.parse(data)) : data;
+              if (delta) onDelta(delta);
+            } catch (err) {
+              console.error('Stream parse error', err);
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Streaming failed', err);
+    } finally {
+      this.loadingService.hide();
+    }
+  }
+
+  private extractDelta(json: any): string | undefined {
+    const choices = json?.choices;
+    if (!Array.isArray(choices) || choices.length === 0) return undefined;
+
+    const delta = choices[0]?.delta;
+    if (!delta) return undefined;
+
+    const content = delta.content;
+
+    if (typeof content === 'string') return content;
+
+    if (Array.isArray(content)) {
+      let text = '';
+      for (const c of content) {
+        if (typeof c?.text === 'string') text += c.text;
+      }
+      return text || undefined;
+    }
+
+    return undefined;
   }
 
   getCompareScenarios(body: CompareScenariosRequest) {

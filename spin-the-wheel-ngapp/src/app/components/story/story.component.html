@@ -7,40 +7,35 @@
     </div>
     
     <div class="col-right">
-      <!-- Show loading text while waiting for LLM response -->
-      <ng-container *ngIf="loading$ | async; else storyContent">
+      <ng-container *ngIf="selectGeneratedText$ | async as generatedText; else waiting">
         <div class="text-wrapper">
-          <span class="generated-text">Loading...</span>
+          <span class="generated-text" [innerHTML]="generatedText.generatedText || '-'" ></span>
+
+          <div class="tooltip-icon" *ngIf="generatedText.sources && generatedText.sources.length>0" (click)="toggleTooltip()">
+            <ng-icon name="iconoirArrowUpRight" size="15" class="icon"></ng-icon>
+          </div>
+          <div class="tooltip-box" *ngIf="isTooltipOpen && generatedText.sources && generatedText.sources.length>0">
+            <div class="row references">
+              <div class="col-6">
+                <b>References:</b>
+              </div>
+              <div class="col-6">
+                <button class="close-btn" (click)="toggleTooltip()">
+                  <ng-icon name="iconoirXmark" size="20" class="icon"></ng-icon>
+                </button>
+              </div>
+            </div>
+            <ul *ngFor="let s of generatedText.sources">
+              <li><a class="green-link" [href]="s" target="_blank">{{ s }}</a></li>
+            </ul>
+          </div>
+
         </div>
       </ng-container>
-
-      <!-- Show generated story once available -->
-      <ng-template #storyContent>
-        <ng-container *ngIf="selectGeneratedText$ | async as generatedText">
-          <div class="text-wrapper">
-            <span class="generated-text" [innerHTML]="generatedText.generatedText || '-'" ></span>
-
-            <div class="tooltip-icon" *ngIf="generatedText.sources && generatedText.sources.length>0" (click)="toggleTooltip()">
-              <ng-icon name="iconoirArrowUpRight" size="15" class="icon"></ng-icon>
-            </div>
-            <div class="tooltip-box" *ngIf="isTooltipOpen && generatedText.sources && generatedText.sources.length>0">
-              <div class="row references">
-                <div class="col-6">
-                  <b>References:</b>
-                </div>
-                <div class="col-6">
-                  <button class="close-btn" (click)="toggleTooltip()">
-                    <ng-icon name="iconoirXmark" size="20" class="icon"></ng-icon>
-                  </button>
-                </div>
-              </div>
-              <ul *ngFor="let s of generatedText.sources">
-                <li><a class="green-link" [href]="s" target="_blank">{{ s }}</a></li>
-              </ul>
-            </div>
-
-          </div>
-        </ng-container>
+      <ng-template #waiting>
+        <div class="text-wrapper">
+          <span class="generated-text">Connecting...</span>
+        </div>
       </ng-template>
     </div>
   </div>

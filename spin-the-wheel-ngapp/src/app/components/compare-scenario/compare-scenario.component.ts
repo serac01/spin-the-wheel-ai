@@ -25,7 +25,7 @@ export class CompareScenarioComponent implements OnInit {
   }
 
   ngOnInit() {
-    if(this.body) this.spinService.getCompareScenarios(this.body)
+    if(this.body) this.spinService.streamCompareScenarios(this.body)
   }
 
   toggleTooltip() {
