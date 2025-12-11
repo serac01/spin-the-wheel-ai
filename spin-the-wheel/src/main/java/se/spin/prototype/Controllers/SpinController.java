@@ -100,17 +100,14 @@ public class SpinController {
             .orElse("No matching Firestore seed; use the provided context to craft a new story.")
         );
 
-        StringBuilder comparison = new StringBuilder();
-        comparison
-            .append("Story 1 (" + firstArgs.getCity() + ", " + firstArgs.getYear() + "):\n").append(firstStory)
-            .append("\n\nStory 2 (" + secondArgs.getCity() + ", " + secondArgs.getYear() + "):\n").append(secondStory);
+        String comparison = huggingFaceService.compareStories(firstArgs, secondArgs, firstStory, secondStory);
 
         GeneratedTextSources generatedTextSources = new GeneratedTextSources();
-        generatedTextSources.setGeneratedText(comparison.toString());
+        generatedTextSources.setGeneratedText(comparison);
 
         List<String> sources = new ArrayList<>();
         sources.add("firestore:stories");
-        sources.add("huggingface:text-model");
+        sources.add("huggingface:AI-Sweden-Models/Llama-3-8B");
 
         generatedTextSources.setSources(sources);
 

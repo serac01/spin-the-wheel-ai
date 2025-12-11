@@ -1,5 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { Observable } from 'rxjs';
+import { LoadingService } from '../../services/loading.service';
 
 @Component({
   selector: 'app-control-buttons',
@@ -16,7 +18,11 @@ export class ControlButtonsComponent {
   @Output() restartClicked = new EventEmitter<void>();
   @Output() compareScenarioClicked = new EventEmitter<void>();
 
-  constructor() { }
+  readonly loading$: Observable<boolean>;
+
+  constructor(private loadingService: LoadingService) {
+    this.loading$ = loadingService.loading$;
+  }
 
   compare() {
     this.compareClicked.emit();

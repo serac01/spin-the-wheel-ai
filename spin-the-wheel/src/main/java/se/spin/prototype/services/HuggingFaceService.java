@@ -15,9 +15,15 @@ import org.springframework.web.server.ResponseStatusException;
 import se.spin.prototype.Beans.SpinArguments;
 import se.spin.prototype.util.EnvUtil;
 
+import java.awt.Color;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+
+import javax.imageio.ImageIO;
 
 @Component
 public class HuggingFaceService {
@@ -27,43 +33,40 @@ public class HuggingFaceService {
     private final RestTemplate restTemplate = new RestTemplate();
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    // Standard Hugging Face Inference API
-    private static final String BASE_API_URL = "https://router.huggingface.co/models/";
-    
-    // Use working models - these are available on the free inference API
-    private static final String TEXT_MODEL = "mistralai/Mistral-7B-Instruct-v0.2";
-    private static final String IMAGE_MODEL = "stabilityai/stable-diffusion-2-1";
-
 
     public String generateStory(SpinArguments arguments, String seedText) {
 
         StringBuilder sb = new StringBuilder();
 
-        sb.append("Use Swedish. Write a short, vivid story set in ").append(arguments.getCity())
+        sb.append("Write a short, vivid story set in ").append(arguments.getCity())
             .append(" around year ").append(arguments.getYear())
-            .append(" about a ").append(arguments.getGender())
+            // Use human-readable gender description instead of object ref
+            .append(" about a ").append(arguments.getGender() != null ? arguments.getGender().getDescription() : "person")
             .append("\n\nContext: ").append(seedText)
             .append("\n\nReturn only the story text.");
 
+        Map<String, Object> userMessage = new HashMap<>();
+        userMessage.put("role", "user");
+        userMessage.put("content", sb.toString());
+
         Map<String, Object> payload = new HashMap<>();
-        payload.put("inputs", sb.toString());
-
-        Map<String, Object> params = new HashMap<>();
-        params.put("max_new_tokens", 256);
-        params.put("temperature", 0.7);
-        params.put("top_p", 0.9);
-        params.put("return_full_text", false); // Only return generated text, not the prompt
-
-        payload.put("parameters", params);
+        payload.put("model", "AI-Sweden-Models/Llama-3-8B-instruct:featherless-ai");
+        payload.put("messages", List.of(userMessage));
+        payload.put("max_tokens", 256);
+        payload.put("temperature", 0.7);
+        payload.put("top_p", 0.9);
+        payload.put("stream", false);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setAccept(List.of(MediaType.APPLICATION_JSON, MediaType.TEXT_PLAIN));
         headers.setBearerAuth(EnvUtil.get("HUGGINGFACE_API_TOKEN"));
+        headers.add("X-Router-Provider", "nscale");
         
         try {
 
             ResponseEntity<String> response = restTemplate.exchange(
-                BASE_API_URL + TEXT_MODEL,
+                "https://router.huggingface.co/v1/chat/completions",
                 HttpMethod.POST, 
                 new HttpEntity<>(payload, headers), 
                 String.class
@@ -73,7 +76,63 @@ public class HuggingFaceService {
                 log.error("HuggingFace call failed: status {} body {}", response.getStatusCode(), response.getBody());
                 throw new ResponseStatusException(response.getStatusCode(), "HuggingFace generation failed");
             }
+            
+            String result = extractText(response.getBody());
 
+            return result;
+
+        } catch (org.springframework.web.client.HttpStatusCodeException ex) {
+
+            String body = ex.getResponseBodyAsString();
+            log.error("HuggingFace text error: status {} body {}", ex.getStatusCode(), body);
+            throw new ResponseStatusException(ex.getStatusCode(), "HuggingFace text error: " + body);
+
+        }
+    }
+
+    public String compareStories(SpinArguments firstArgs, SpinArguments secondArgs, String firstStory, String secondStory) {
+
+        String prompt = "Compare the two historical stories below. Highlight key differences in setting, tone, and perspective. Be concise (max 6 sentences). " +
+            "Story 1 (" + firstArgs.getCity() + ", " + firstArgs.getYear() + "):\n" + firstStory + "\n\n" +
+            "Story 2 (" + secondArgs.getCity() + ", " + secondArgs.getYear() + "):\n" + secondStory;
+
+        Map<String, Object> userMessage = new HashMap<>();
+        userMessage.put("role", "user");
+        userMessage.put("content", prompt);
+
+        return sendChatCompletion(userMessage, 256);
+    }
+
+    private String sendChatCompletion(Map<String, Object> userMessage, int maxTokens) {
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("model", "AI-Sweden-Models/Llama-3-8B-instruct:featherless-ai");
+        payload.put("messages", List.of(userMessage));
+        payload.put("max_tokens", maxTokens);
+        payload.put("temperature", 0.7);
+        payload.put("top_p", 0.9);
+        payload.put("stream", false);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setAccept(List.of(MediaType.APPLICATION_JSON, MediaType.TEXT_PLAIN));
+        headers.setBearerAuth(EnvUtil.get("HUGGINGFACE_API_TOKEN"));
+        headers.add("X-Router-Provider", "nscale");
+        
+        try {
+
+            ResponseEntity<String> response = restTemplate.exchange(
+                "https://router.huggingface.co/v1/chat/completions",
+                HttpMethod.POST, 
+                new HttpEntity<>(payload, headers), 
+                String.class
+            );
+
+            if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
+                log.error("HuggingFace call failed: status {} body {}", response.getStatusCode(), response.getBody());
+                throw new ResponseStatusException(response.getStatusCode(), "HuggingFace generation failed");
+            }
+            
             return extractText(response.getBody());
 
         } catch (org.springframework.web.client.HttpStatusCodeException ex) {
@@ -86,66 +145,24 @@ public class HuggingFaceService {
     }
 
     public ImageResult generateImage(SpinArguments arguments) {
-
-        String imagePrompt = "A cinematic illustration in the style of an art poster, set in " + arguments.getCity()
-            + " around year " + arguments.getYear()
-            + ". Main subject: " + (arguments.getGender() != null ? arguments.getGender().getDescription() : "person")
-            + ". Vivid colors, high detail, dramatic lighting.";
-
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("inputs", imagePrompt);
-
-        Map<String, Object> params = new HashMap<>();
-        params.put("num_inference_steps", 30);
-        params.put("guidance_scale", 7.5);
-
-        payload.put("parameters", params);
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.setBearerAuth(EnvUtil.get("HUGGINGFACE_API_TOKEN"));
+        int width = 512;
+        int height = 512;
 
         try {
+            BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+            var graphics = image.createGraphics();
+            graphics.setColor(Color.BLACK);
+            graphics.fillRect(0, 0, width, height);
+            graphics.dispose();
 
-            // Image models return binary data directly
-            ResponseEntity<byte[]> response = restTemplate.exchange(
-                BASE_API_URL + IMAGE_MODEL,
-                HttpMethod.POST,  
-                new HttpEntity<>(payload, headers), 
-                byte[].class
-            );
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            ImageIO.write(image, "png", baos);
 
-            if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
-                log.error("HuggingFace image call failed: status {} body length {}", 
-                    response.getStatusCode(), response.getBody() != null ? response.getBody().length : 0);
-                throw new ResponseStatusException(response.getStatusCode(), "HuggingFace image generation failed");
-            }
-
-            // Check if response is actually an error (JSON) or image data
-            byte[] responseBody = response.getBody();
-            MediaType contentType = response.getHeaders().getContentType();
-
-            // If Content-Type is application/json, it's probably an error
-            if (contentType != null && contentType.includes(MediaType.APPLICATION_JSON)) {
-                String errorBody = new String(responseBody);
-                log.error("HuggingFace returned JSON instead of image: {}", errorBody);
-                throw new ResponseStatusException(org.springframework.http.HttpStatus.BAD_GATEWAY, 
-                    "HuggingFace returned error: " + errorBody);
-            }
-
-            // Assume PNG if no content type specified
-            MediaType imageType = (contentType != null && contentType.getType().equals("image")) 
-                ? contentType 
-                : MediaType.IMAGE_PNG;
-
-            return new ImageResult(responseBody, imageType);
-
-        } catch (org.springframework.web.client.HttpStatusCodeException ex) {
-
-            String body = ex.getResponseBodyAsString();
-            log.error("HuggingFace image error: status {} body {}", ex.getStatusCode(), body);
-            throw new ResponseStatusException(ex.getStatusCode(), "HuggingFace image error: " + body);
-
+            return new ImageResult(baos.toByteArray(), MediaType.IMAGE_PNG);
+        } catch (IOException e) {
+            log.error("Failed to generate blank image", e);
+            throw new ResponseStatusException(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR,
+                "Failed to generate blank image", e);
         }
     }
 
@@ -155,18 +172,18 @@ public class HuggingFaceService {
 
             JsonNode node = objectMapper.readTree(body);
 
-            // Standard HF format: [{"generated_text": "..."}]
-            if (node.isArray() && node.size() > 0) {
-
-                JsonNode first = node.get(0);
-
-                if (first.has("generated_text")) {
-                    return first.get("generated_text").asText();
+            // OpenAI-compatible chat completion: choices[0].message.content
+            if (node.has("choices") && node.get("choices").isArray() && node.get("choices").size() > 0) {
+                JsonNode firstChoice = node.get("choices").get(0);
+                if (firstChoice.has("message") && firstChoice.get("message").has("content")) {
+                    return firstChoice.get("message").get("content").asText();
                 }
-                
             }
 
-            // Alternative format: {"generated_text": "..."}
+            // Legacy inference output: [{"generated_text": "..."}] or {"generated_text": "..."}
+            if (node.isArray() && node.size() > 0 && node.get(0).has("generated_text")) {
+                return node.get(0).get("generated_text").asText();
+            }
             if (node.isObject() && node.has("generated_text")) {
                 return node.get("generated_text").asText();
             }

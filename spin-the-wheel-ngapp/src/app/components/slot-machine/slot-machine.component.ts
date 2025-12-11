@@ -3,6 +3,7 @@ import { Gender, GeneratedTextSources, SpinArguments } from '../../api/models';
 import { CommonModule } from '@angular/common';
 import { StoryComponent } from '../story/story.component';
 import { SpinService } from '../../services/spin.service';
+import { LoadingService } from '../../services/loading.service';
 
 @Component({
   selector: 'app-slot-machine',
@@ -10,7 +11,8 @@ import { SpinService } from '../../services/spin.service';
   imports: [CommonModule, StoryComponent],
   templateUrl: './slot-machine.component.html',
   styleUrls: ['./slot-machine.component.css'],
-  providers: [SpinService]
+  // Provide per-slot instances so one slot's loading state or generated text does not affect the other.
+  providers: [SpinService, LoadingService]
 })
 export class SlotMachineComponent implements OnInit, OnChanges {
   @Input() id!: number;

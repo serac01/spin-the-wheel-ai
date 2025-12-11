@@ -23,14 +23,14 @@ public class ParameterizationController {
     public List<Integer> getTimes() {
         
         int start = 1800;
-        int end = 2025;
+        int end = 2000;
         List<Integer> decades = new ArrayList<>();
 
-        for (int year = start; year <= end; year += 10) {
+        for (int year = start; year <= end; year += 50) {
             decades.add(year);
         }
 
-        if ((end % 10) != 0) {
+        if ((end % 50) != 0) {
             decades.add(end);
         }
 
@@ -42,21 +42,7 @@ public class ParameterizationController {
         return List.of(
                 "Stockholm",
                 "Göteborg",
-                "Malmö",
-                "Uppsala",
-                "Västerås",
-                "Örebro",
-                "Linköping",
-                "Helsingborg",
-                "Jönköping",
-                "Gävle",
-                "Luleå",
-                "Umeå",
-                "Borås",
-                "Södertälje",
-                "Sundsvall",
-                "Halmstad",
-                "Kalmar"
+                "Malmö"
         );
     }
 }

@@ -1,11 +1,12 @@
-import { Component, HostListener, Input, OnDestroy, OnInit } from '@angular/core';
+import { AfterViewInit, ChangeDetectionStrategy, Component, HostListener, Input, OnInit } from '@angular/core';
 import { DomSanitizer, SafeUrl } from '@angular/platform-browser';
 import { SpinService } from '../../services/spin.service';
 import { CommonModule } from '@angular/common';
 import { GeneratedTextSources, SpinArguments } from '../../api/models';
-import { Observable, Subject, takeUntil } from 'rxjs';
+import { Observable, map } from 'rxjs';
 import { NgIconComponent, provideIcons } from '@ng-icons/core';
 import { iconoirArrowUpRight, iconoirXmark } from "@ng-icons/iconoir";
+import { LoadingService } from '../../services/loading.service';
 
 @Component({
   selector: 'app-story',
@@ -13,36 +14,37 @@ import { iconoirArrowUpRight, iconoirXmark } from "@ng-icons/iconoir";
   imports: [CommonModule, NgIconComponent],
   templateUrl: './story.component.html',
   styleUrls: ['./story.component.css'],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [provideIcons({ iconoirArrowUpRight, iconoirXmark })]
 })
-export class StoryComponent implements OnInit, OnDestroy {
+export class StoryComponent implements OnInit, AfterViewInit {
   @Input() body: SpinArguments | undefined;
   @Input() isComparing: boolean = false;
   readonly selectGeneratedText$: Observable<GeneratedTextSources>
-  imageUrl: SafeUrl | null = null;
+  imageUrl$: Observable<SafeUrl | null> | null = null;
   isTooltipOpen = false;
-  private destroyed$ = new Subject<void>();
+  loading$: Observable<boolean>;
 
-  constructor(private spinService: SpinService, private sanitizer: DomSanitizer) {
+  constructor(private spinService: SpinService, private sanitizer: DomSanitizer, private loadingService: LoadingService) {
     this.selectGeneratedText$ = spinService.selectGeneratedText$;
+    this.loading$ = loadingService.loading$;
   }
 
   ngOnInit() {
     if (this.body) {
-      this.spinService.getGeneratedImage(this.body)
-      this.spinService.getGeneratedText(this.body)
-      this.spinService.selectGeneratedImage$
-        .pipe(takeUntil(this.destroyed$))
-        .subscribe(blob => {
-          const url = URL.createObjectURL(blob);
-          this.imageUrl = this.sanitizer.bypassSecurityTrustUrl(url);
-        });
+      this.imageUrl$ = this.spinService.selectGeneratedImage$
+        .pipe(map(blob => this.sanitizer.bypassSecurityTrustUrl(URL.createObjectURL(blob))));
     }
   }
 
-  ngOnDestroy(): void {
-    this.destroyed$.next();
-    this.destroyed$.complete();
+  ngAfterViewInit(): void {
+    if (this.body) {
+      // Trigger API calls after first change detection pass to avoid NG0100
+      queueMicrotask(() => {
+        this.spinService.getGeneratedImage(this.body!);
+        this.spinService.getGeneratedText(this.body!);
+      });
+    }
   }
 
   toggleTooltip() {
