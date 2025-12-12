@@ -32,14 +32,24 @@ public class FirestoreService {
 
     private static final Logger log = LoggerFactory.getLogger(FirestoreService.class);
     private final Firestore firestore;
+    private final boolean firestoreEnabled;
 
     public FirestoreService() {
-        this.firestore = initFirestore();
+        this.firestore = initFirestoreOrNull();
+        this.firestoreEnabled = (this.firestore != null);
         //seedStories();
     }
 
 
     public Optional<String> fetchSeedText(String city, Integer year, Gender gender) {
+
+        if (!firestoreEnabled) {
+            return Optional.empty();
+        }
+
+        if (gender == null || gender.getId() == null) {
+            return Optional.empty();
+        }
 
         try {
 
@@ -65,15 +75,23 @@ public class FirestoreService {
         }
     }
 
-    private Firestore initFirestore() {
+    private Firestore initFirestoreOrNull() {
 
         try {
+
+            String credentialsPath = EnvUtil.get("GOOGLE_APPLICATION_CREDENTIALS");
+            String projectId = EnvUtil.get("FIREBASE_PROJECT_ID");
+
+            if (credentialsPath == null || credentialsPath.isBlank() || projectId == null || projectId.isBlank()) {
+                log.warn("Firestore disabled (missing GOOGLE_APPLICATION_CREDENTIALS and/or FIREBASE_PROJECT_ID)");
+                return null;
+            }
 
             if (FirebaseApp.getApps().isEmpty()) {
 
                 FirebaseOptions.Builder builder = FirebaseOptions.builder();
-                builder.setCredentials(GoogleCredentials.fromStream(new FileInputStream(EnvUtil.get("GOOGLE_APPLICATION_CREDENTIALS"))));
-                builder.setProjectId(EnvUtil.get("FIREBASE_PROJECT_ID"));
+                builder.setCredentials(GoogleCredentials.fromStream(new FileInputStream(credentialsPath)));
+                builder.setProjectId(projectId);
 
                 FirebaseApp.initializeApp(builder.build());
             }
@@ -81,8 +99,8 @@ public class FirestoreService {
             return FirestoreClient.getFirestore();
 
         } catch (IOException e) {
-            log.error("Failed to initialize Firestore", e);
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Could not initialize Firestore", e);
+            log.error("Failed to initialize Firestore; running with Firestore disabled", e);
+            return null;
         }
     }
 
