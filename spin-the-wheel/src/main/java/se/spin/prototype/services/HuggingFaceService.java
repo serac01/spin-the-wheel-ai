@@ -279,7 +279,7 @@ public class HuggingFaceService {
         int width = 512;
         int height = 512;
 
-        String prompt = buildStoryPrompt(arguments, seedText) + " Don't add any watermarks.";
+        String prompt = buildStoryPrompt(arguments, seedText);
 
         URI uri = UriComponentsBuilder
             .fromHttpUrl("https://image.pollinations.ai/prompt/{prompt}")

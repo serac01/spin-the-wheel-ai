@@ -13,6 +13,6 @@ export const appConfig: ApplicationConfig = {
     provideHttpClient(withInterceptorsFromDi()),
     ApiModule, { provide: ApiConfiguration, useValue: { rootUrl: 'http://localhost:8080' } },
     provideAnimations(),
-    provideZoneChangeDetection({ eventCoalescing: true }), provideRouter(routes)
+    provideZoneChangeDetection({ eventCoalescing: true })
   ]
 };

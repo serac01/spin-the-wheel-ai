@@ -40,16 +40,6 @@ export class SpinService {
     );
   }
 
-  getGeneratedText(body: SpinArguments) {
-    this.loadingService.show();
-    this.applicationService.effect(
-      this.rest.postGeneratedText({ body }),
-      (generatedText) => { this.updateState((s) => ({ ...s, generatedText })); },
-      undefined,
-      () => this.loadingService.hide()
-    );
-  }
-
   streamGeneratedText(body: SpinArguments) {
     const url = `${this.apiConfiguration.rootUrl}/api/spin/story/stream`;
     this.cleanState();
@@ -188,16 +178,6 @@ export class SpinService {
     }
 
     return undefined;
-  }
-
-  getCompareScenarios(body: CompareScenariosRequest) {
-    this.loadingService.show();
-    this.applicationService.effect(
-      this.rest.postCompareScenarios({ body }),
-      (compareScenariosText) => { this.updateState((s) => ({ ...s, compareScenariosText })); },
-      undefined,
-      () => this.loadingService.hide()
-    );
   }
 
   cleanState() { this.state$.next({}); }
