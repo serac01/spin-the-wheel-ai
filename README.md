@@ -27,7 +27,14 @@ cd .\spin-the-wheel
 mvn -DskipTests package; java -jar .\target\demo-0.0.1-SNAPSHOT.jar
 ```
 
-If you have a working Maven Wrapper setup (i.e. `spin-the-wheel/.mvn/wrapper/*` exists), you can also run:
+If you want to run directly (no packaged JAR), you can use the Spring Boot Maven plugin:
+
+```powershell
+cd .\spin-the-wheel
+mvn -DskipTests org.springframework.boot:spring-boot-maven-plugin:run
+```
+
+If you have a working Maven Wrapper setup (i.e. `spin-the-wheel/.mvn/wrapper/*` exists), you can also run (this repo currently does not include the wrapper directory):
 
 ```powershell
 cd .\spin-the-wheel
@@ -46,7 +53,7 @@ In a separate terminal:
 
 ```powershell
 cd .\spin-the-wheel-ngapp
-npm install --legacy-peer-deps
+npm install
 npm run start
 ```
 
@@ -63,7 +70,7 @@ The backend reads environment variables from the OS **or** from a `.env` file lo
 Create `spin-the-wheel/.env` with:
 
 ```dotenv
-# Required for text/image generation
+# Required for text generation (story + compare)
 HUGGINGFACE_API_TOKEN=hf_...
 
 # Optional: enable Firestore seed lookup (otherwise the app runs with Firestore disabled)
@@ -74,6 +81,10 @@ FIREBASE_PROJECT_ID=your-firebase-project-id
 Notes:
 
 - If `GOOGLE_APPLICATION_CREDENTIALS` and/or `FIREBASE_PROJECT_ID` are missing, the backend logs that Firestore is disabled and continues using a fallback seed.
+
+## Image generation
+
+`POST /api/spin/image` fetches an image from `pollinations.ai` using the same prompt text as the story generation prompt.
 
 ## API overview
 

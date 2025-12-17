@@ -19,15 +19,13 @@ import reactor.core.publisher.Flux;
 import se.spin.prototype.Beans.SpinArguments;
 import se.spin.prototype.util.EnvUtil;
 
-import java.awt.Color;
-import java.awt.image.BufferedImage;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.net.URI;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import javax.imageio.ImageIO;
+import org.springframework.web.util.UriComponentsBuilder;
 
 @Component
 public class HuggingFaceService {
@@ -39,20 +37,34 @@ public class HuggingFaceService {
     private final WebClient webClient = WebClient.builder().build();
 
 
-    public String generateStory(SpinArguments arguments, String seedText) {
+    private String buildStoryPrompt(SpinArguments arguments, String seedText) {
 
         StringBuilder sb = new StringBuilder();
 
         sb.append("Write a short, realistic story set in ").append(arguments.getCity())
             .append(" around year ").append(arguments.getYear())
-            // Use human-readable gender description instead of object ref
-            .append(" about a ").append(arguments.getGender() != null ? arguments.getGender().getDescription() : "person")
+            .append(" about a ").append(arguments.getGender().getDescription())
             .append("\n\nContext: ").append(seedText)
             .append("\n\nReturn only the story text.");
 
+        return sb.toString();
+    }
+
+    private String buildComparePrompt(SpinArguments firstArgs, SpinArguments secondArgs, String firstStory, String secondStory) {
+
+        return "Compare the two historical stories below. Highlight key differences in setting, tone, and perspective. Be concise (max 6 sentences). " +
+            "Story 1 (" + firstArgs.getCity() + ", " + firstArgs.getYear() + ", " + firstArgs.getGender().getDescription() + "):\n" + firstStory + "\n\n" +
+            "Story 2 (" + secondArgs.getCity() + ", " + secondArgs.getYear() + ", " + secondArgs.getGender().getDescription() + "):\n" + secondStory;
+
+    }
+
+    public String generateStory(SpinArguments arguments, String seedText) {
+
+        String prompt = buildStoryPrompt(arguments, seedText);
+
         Map<String, Object> userMessage = new HashMap<>();
         userMessage.put("role", "user");
-        userMessage.put("content", sb.toString());
+        userMessage.put("content", prompt);
 
         Map<String, Object> payload = new HashMap<>();
         payload.put("model", "AI-Sweden-Models/Llama-3-8B-instruct:featherless-ai");
@@ -97,17 +109,11 @@ public class HuggingFaceService {
 
     public Flux<String> streamStory(SpinArguments arguments, String seedText) {
 
-        StringBuilder sb = new StringBuilder();
-
-        sb.append("Write a short, vivid story set in ").append(arguments.getCity())
-            .append(" around year ").append(arguments.getYear())
-            .append(" about a ").append(arguments.getGender() != null ? arguments.getGender().getDescription() : "person")
-            .append("\n\nContext: ").append(seedText)
-            .append("\n\nReturn only the story text.");
+        String prompt = buildStoryPrompt(arguments, seedText);
 
         Map<String, Object> userMessage = new HashMap<>();
         userMessage.put("role", "user");
-        userMessage.put("content", sb.toString());
+        userMessage.put("content", prompt);
 
         Map<String, Object> payload = new HashMap<>();
         payload.put("model", "AI-Sweden-Models/Llama-3-8B-instruct:featherless-ai");
@@ -141,9 +147,7 @@ public class HuggingFaceService {
 
     public String compareStories(SpinArguments firstArgs, SpinArguments secondArgs, String firstStory, String secondStory) {
 
-        String prompt = "Compare the two historical stories below. Highlight key differences in setting, tone, and perspective. Be concise (max 6 sentences). " +
-            "Story 1 (" + firstArgs.getCity() + ", " + firstArgs.getYear() + "):\n" + firstStory + "\n\n" +
-            "Story 2 (" + secondArgs.getCity() + ", " + secondArgs.getYear() + "):\n" + secondStory;
+        String prompt = buildComparePrompt(firstArgs, secondArgs, firstStory, secondStory);
 
         Map<String, Object> userMessage = new HashMap<>();
         userMessage.put("role", "user");
@@ -154,9 +158,7 @@ public class HuggingFaceService {
 
     public Flux<String> streamCompareStories(SpinArguments firstArgs, SpinArguments secondArgs, String firstStory, String secondStory) {
 
-        String prompt = "Compare the two historical stories below. Highlight key differences in setting, tone, and perspective. Be concise (max 6 sentences). " +
-            "Story 1 (" + firstArgs.getCity() + ", " + firstArgs.getYear() + "):\n" + firstStory + "\n\n" +
-            "Story 2 (" + secondArgs.getCity() + ", " + secondArgs.getYear() + "):\n" + secondStory;
+        String prompt = buildComparePrompt(firstArgs, secondArgs, firstStory, secondStory);
 
         Map<String, Object> userMessage = new HashMap<>();
         userMessage.put("role", "user");
@@ -272,25 +274,54 @@ public class HuggingFaceService {
         }
     }
 
-    public ImageResult generateImage(SpinArguments arguments) {
+    public ImageResult generateImage(SpinArguments arguments, String seedText) {
+
         int width = 512;
         int height = 512;
 
+        String prompt = buildStoryPrompt(arguments, seedText) + " Don't add any watermarks.";
+
+        URI uri = UriComponentsBuilder
+            .fromHttpUrl("https://image.pollinations.ai/prompt/{prompt}")
+            .queryParam("width", width)
+            .queryParam("height", height)
+            .buildAndExpand(prompt)
+            .encode()
+            .toUri();
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setAccept(List.of(MediaType.IMAGE_PNG, MediaType.IMAGE_JPEG, MediaType.ALL));
+
         try {
-            BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
-            var graphics = image.createGraphics();
-            graphics.setColor(Color.BLACK);
-            graphics.fillRect(0, 0, width, height);
-            graphics.dispose();
 
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            ImageIO.write(image, "png", baos);
+            ResponseEntity<byte[]> response = restTemplate.exchange(
+                uri,
+                HttpMethod.GET,
+                new HttpEntity<>(headers),
+                byte[].class
+            );
 
-            return new ImageResult(baos.toByteArray(), MediaType.IMAGE_PNG);
-        } catch (IOException e) {
-            log.error("Failed to generate blank image", e);
-            throw new ResponseStatusException(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR,
-                "Failed to generate blank image", e);
+            if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null || response.getBody().length == 0) {
+                log.error("Pollinations image call failed: status {}", response.getStatusCode());
+                throw new ResponseStatusException(org.springframework.http.HttpStatus.BAD_GATEWAY,
+                    "Pollinations image generation failed");
+            }
+
+            MediaType contentType = response.getHeaders().getContentType();
+            if (contentType == null) {
+                contentType = MediaType.IMAGE_JPEG;
+            }
+
+            return new ImageResult(response.getBody(), contentType);
+
+        } catch (org.springframework.web.client.HttpStatusCodeException ex) {
+            String body = ex.getResponseBodyAsString();
+            log.error("Pollinations image error: status {} body {}", ex.getStatusCode(), body);
+            throw new ResponseStatusException(ex.getStatusCode(), "Pollinations image error: " + body);
+        } catch (Exception ex) {
+            log.error("Pollinations image request failed", ex);
+            throw new ResponseStatusException(org.springframework.http.HttpStatus.BAD_GATEWAY,
+                "Pollinations image generation failed", ex);
         }
     }
 

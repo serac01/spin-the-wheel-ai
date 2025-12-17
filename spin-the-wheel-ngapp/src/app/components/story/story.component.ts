@@ -48,6 +48,21 @@ export class StoryComponent implements OnInit, AfterViewInit {
     this.isTooltipOpen = !this.isTooltipOpen;
   }
 
+  formatSourceLabel(url: string): string {
+    if (url.includes('skbl.se')) {
+      return 'SKBL - Svenskt kvinnobiografiskt lexikon';
+    }
+    if (url.includes('huggingface.co')) {
+      const match = url.match(/huggingface\.co\/([^\/]+\/[^\/]+)/);
+      return match ? `HuggingFace: ${match[1]}` : 'HuggingFace Model';
+    }
+    try {
+      return new URL(url).hostname;
+    } catch {
+      return url;
+    }
+  }
+
   @HostListener('document:click', ['$event'])
   onClick(event: Event) {
     if (!(event.target as HTMLElement).closest('.tooltip-icon') &&

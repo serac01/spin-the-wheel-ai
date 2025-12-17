@@ -53,6 +53,7 @@ export class SpinService {
   streamGeneratedText(body: SpinArguments) {
     const url = `${this.apiConfiguration.rootUrl}/api/spin/story/stream`;
     this.cleanState();
+    let sources: string[] = [];
     this.streamSse(url, body, (delta) => {
       this.updateState((s) => {
         const existing = s.generatedText?.generatedText ?? '';
@@ -60,10 +61,12 @@ export class SpinService {
           ...s,
           generatedText: {
             generatedText: existing + delta,
-            sources: ['firestore:stories', 'huggingface:AI-Sweden-Models/Llama-3-8B']
+            sources: sources
           }
         };
       });
+    }, (receivedSources) => {
+      sources = receivedSources;
     });
   }
 
@@ -73,6 +76,7 @@ export class SpinService {
     // Reset only comparison text to allow stories to remain visible.
     this.updateState((s) => ({ ...s, compareScenariosText: undefined }));
 
+    let sources: string[] = [];
     this.streamSse(url, body, (delta) => {
       this.updateState((s) => {
         const existing = s.compareScenariosText?.generatedText ?? '';
@@ -80,14 +84,16 @@ export class SpinService {
           ...s,
           compareScenariosText: {
             generatedText: existing + delta,
-            sources: ['firestore:stories', 'huggingface:AI-Sweden-Models/Llama-3-8B']
+            sources: sources
           }
         };
       });
+    }, (receivedSources) => {
+      sources = receivedSources;
     });
   }
 
-  private async streamSse(url: string, body: unknown, onDelta: (delta: string) => void) {
+  private async streamSse(url: string, body: unknown, onDelta: (delta: string) => void, onSources?: (sources: string[]) => void) {
     const decoder = new TextDecoder();
     this.loadingService.show();
 
@@ -115,6 +121,16 @@ export class SpinService {
 
         for (const event of events) {
           const lines = event.split(/\r?\n/);
+          
+          // Check for event type (sources event)
+          let eventType = 'message';
+          for (const rawLine of lines) {
+            const line = rawLine.trimEnd();
+            if (line.startsWith('event:')) {
+              eventType = line.substring(6).trim();
+            }
+          }
+          
           for (const rawLine of lines) {
             const line = rawLine.trimEnd();
             if (!line.startsWith('data:')) continue;
@@ -127,6 +143,13 @@ export class SpinService {
             }
 
             if (!data || data === '[DONE]') continue;
+
+            // Handle sources event
+            if (eventType === 'sources' && onSources) {
+              const sources = data.split(',').map(s => s.trim()).filter(s => s);
+              onSources(sources);
+              continue;
+            }
 
             try {
               const isJson = data.trim().startsWith('{');
