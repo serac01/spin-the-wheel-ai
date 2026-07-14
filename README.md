@@ -1,130 +1,113 @@
-# Spin the Wheel (Prototype)
+# 🎡 Spin the Wheel!
 
-Full-stack prototype with:
+> An AI-powered interactive storytelling platform that explores **gender identities across different historical periods and regions of Sweden** through procedurally generated narratives and illustrations.
 
-- **Backend**: Spring Boot (Java) API + SSE streaming endpoints
-- **Frontend**: Angular app consuming the API (generated OpenAPI client)
+The project reimagines the original **"Spin the Wheel!"** concept by leveraging **Generative AI** to create historically grounded life scenarios. Users are assigned randomized identities and experience how gender, geography, and historical context influenced everyday life, encouraging reflection on equality, diversity, and social change.
 
-## Repo layout
+Developed in collaboration with the **Gender Equality Office of Umeå Municipality** and **Umeå University**, the project focuses on generating transparent, trustworthy, and culturally accurate stories supported by traceable historical sources.
 
-- `spin-the-wheel/` — Spring Boot backend
-- `spin-the-wheel-ngapp/` — Angular frontend
+---
 
-## Prerequisites
+## 📸 Preview
 
-- **JDK 20+** (the Maven compiler plugin targets Java 20)
-- **Node.js 18.19+ / 20+** (Angular 19)
-- (Optional) **Firebase service account JSON** if you want Firestore seed lookup
+| One story | Two stories |
+|------|-----------------|
+| ![](images/preview1.png) | ![](images/preview2.png) |
 
-## Quick start (local dev)
+---
 
-### 1) Backend (Spring Boot)
+## ✨ Features
 
-From the backend folder:
+- 🎡 Interactive "Spin the Wheel" experience
+- 🤖 AI-generated historical life stories
+- 🖼️ AI-generated illustrations accompanying each story
+- 🇸🇪 Scenarios covering different Swedish regions and historical periods
+- 👥 Exploration of gender identities and societal norms
+- 📚 Historically informed and traceable content generation
+- ⚖️ Focus on fairness, bias mitigation, and ethical AI
+- 🔍 Explainable AI concepts for increased transparency
+- 🎮 Gamified educational experience
 
-```powershell
-cd .\spin-the-wheel
-mvn -DskipTests package; java -jar .\target\demo-0.0.1-SNAPSHOT.jar
+---
+
+## 🏗️ Project Goals
+
+The objective of the project is to build a proof-of-concept platform capable of automatically generating historically accurate stories and images while promoting awareness of gender equality throughout Swedish history.
+
+The system aims to:
+
+- Generate realistic historical scenarios using Generative AI
+- Represent different genders, locations, and historical periods
+- Ground generated content in trustworthy historical sources
+- Reduce cultural and historical bias in AI-generated narratives
+- Provide transparency regarding how stories are produced
+- Encourage discussion and reflection through interactive storytelling
+
+---
+
+## 🛠️ Technologies
+
+Depending on the implementation, the project makes use of technologies such as:
+
+- TypeScript
+- React
+- Next.js
+- Tailwind CSS
+- Node.js
+- OpenAI APIs
+- Image Generation Models
+- Retrieval-Augmented Generation (RAG)
+- Large Language Models (LLMs)
+
+---
+
+## 📂 Project Structure
+
+```
+spin-the-wheel/
+├── app/               # Application pages
+├── components/        # Reusable UI components
+├── public/            # Static assets
+├── lib/               # Business logic and utilities
+├── styles/            # Styling
+└── README.md
 ```
 
-If you want to run directly (no packaged JAR), you can use the Spring Boot Maven plugin:
+---
 
-```powershell
-cd .\spin-the-wheel
-mvn -DskipTests org.springframework.boot:spring-boot-maven-plugin:run
-```
+## 🎯 Learning Outcomes
 
-If you have a working Maven Wrapper setup (i.e. `spin-the-wheel/.mvn/wrapper/*` exists), you can also run (this repo currently does not include the wrapper directory):
+This project explores several modern software engineering and AI concepts, including:
 
-```powershell
-cd .\spin-the-wheel
-.\mvnw.cmd spring-boot:run
-```
+- Generative AI applications
+- Human-centered AI design
+- Prompt engineering
+- Explainable AI (XAI)
+- Retrieval-Augmented Generation (RAG)
+- Ethical AI
+- Bias mitigation
+- Interactive storytelling
+- Full-stack web development
 
-Backend defaults to:
+---
 
-- [http://localhost:8080](http://localhost:8080)
-- OpenAPI JSON: [http://localhost:8080/v3/api-docs](http://localhost:8080/v3/api-docs)
-- Swagger UI: [http://localhost:8080/swagger-ui/index.html](http://localhost:8080/swagger-ui/index.html)
+## 🤝 Stakeholders
 
-### 2) Frontend (Angular)
+This project was developed in collaboration with:
 
-In a separate terminal:
+- **Umeå Municipality – Gender Equality Office**
+- **Umeå University**
 
-```powershell
-cd .\spin-the-wheel-ngapp
-npm install
-npm run start
-```
+---
 
-Frontend defaults to:
+## 🌍 Purpose
 
-- [http://localhost:4200](http://localhost:4200)
+The project demonstrates how Generative AI can be used responsibly to create educational experiences that foster empathy, historical understanding, and awareness of gender inequality across different places and periods in Swedish history.
 
-> CORS is configured in the backend to allow `http://localhost:4200`.
+Rather than presenting history through static information, the platform allows users to experience diverse perspectives through personalized, AI-generated narratives.
 
-## Configuration (.env)
+---
 
-The backend reads environment variables from the OS **or** from a `.env` file located in the backend working directory (`spin-the-wheel/.env`).
+## 📄 License
 
-Create `spin-the-wheel/.env` with:
-
-```dotenv
-# Required for text generation (story + compare)
-HUGGINGFACE_API_TOKEN=hf_...
-
-# Optional: enable Firestore seed lookup (otherwise the app runs with Firestore disabled)
-GOOGLE_APPLICATION_CREDENTIALS=C:\\path\\to\\service-account.json
-FIREBASE_PROJECT_ID=your-firebase-project-id
-```
-
-Notes:
-
-- If `GOOGLE_APPLICATION_CREDENTIALS` and/or `FIREBASE_PROJECT_ID` are missing, the backend logs that Firestore is disabled and continues using a fallback seed.
-
-## Image generation
-
-`POST /api/spin/image` fetches an image from `pollinations.ai` using the same prompt text as the story generation prompt.
-
-## API overview
-
-Base paths:
-
-- `GET /api/parameterization/genders`
-- `GET /api/parameterization/times`
-- `GET /api/parameterization/places`
-
-Spin endpoints:
-
-- `POST /api/spin/story`
-- `POST /api/spin/story/stream` (Server-Sent Events)
-- `POST /api/spin/image` (returns an image)
-- `POST /api/spin/compare-scenarios`
-- `POST /api/spin/compare-scenarios/stream` (Server-Sent Events)
-
-## Regenerate Angular API client (OpenAPI)
-
-The Angular app is set up to regenerate API stubs from the running backend:
-
-```powershell
-cd .\spin-the-wheel-ngapp
-npm run stubs
-```
-
-This expects the backend to be running at `http://localhost:8080/v3/api-docs`.
-
-## Build
-
-Backend JAR:
-
-```powershell
-cd .\spin-the-wheel
-mvn clean package
-```
-
-Frontend production build:
-
-```powershell
-cd .\spin-the-wheel-ngapp
-npm run build
-```
+This project was developed for academic and research purposes.
